@@ -1169,7 +1169,7 @@ CREATE POLICY tenant_isolation_select ON audit_logs FOR SELECT TO pharmacy_app U
 CREATE POLICY tenant_isolation_insert ON audit_logs FOR INSERT TO pharmacy_app WITH CHECK (tenant_id = current_tenant_id());
 
 CREATE POLICY tenant_isolation_select ON subscriptions FOR SELECT TO pharmacy_app USING (tenant_id = current_tenant_id());
-RLS_POLICIES_SQL_END"""[18:22].replace("RLS_POLICIES_SQL_END", "")
+"""
 
 INDEXES_SQL = r"""
 -- Tenants
