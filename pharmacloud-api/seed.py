@@ -160,7 +160,7 @@ def hash_password(password: str) -> str:
     except ImportError:
         # Pre-calculated bcrypt hash for 'admin'
         if password == "admin":
-            return "$2b$12$Z16N4XkG3wK/1L5xIe2Hpe3QEq4bQ/e07vI7gGg4.x05WqP7/oA3u"
+            return "$2b$12$KwRBusBDx7A7nW/huG7PkO.foSyhkKkAsOXHlv3d7VhghS8HdG8Lm"
         raise RuntimeError("bcrypt library is required to hash custom passwords.")
 
 def seed_core_data():
@@ -179,7 +179,14 @@ def seed_core_data():
                 # To be absolutely sure, check if there are actual plans inserted
                 check_rows = conn.execute(text("SELECT count(*) FROM plans")).scalar()
                 if check_rows > 0:
-                    logger.info("Database already contains seed data (plans found). Skipping seeding.")
+                    # Database is already seeded, but make sure the admin password hash is updated to the correct one
+                    admin_password = "admin"
+                    hashed_pwd = hash_password(admin_password)
+                    conn.execute(
+                        text("UPDATE staff SET password_hash = :hash WHERE email = 'admin@pharmacy.com'"),
+                        {"hash": hashed_pwd}
+                    )
+                    logger.info("Database already contains seed data (plans found). Updated admin password hash. Skipping full seeding.")
                     return
         except Exception as e:
             logger.error(f"Checking plans table encountered an error: {e}")
@@ -1162,7 +1169,7 @@ CREATE POLICY tenant_isolation_select ON audit_logs FOR SELECT TO pharmacy_app U
 CREATE POLICY tenant_isolation_insert ON audit_logs FOR INSERT TO pharmacy_app WITH CHECK (tenant_id = current_tenant_id());
 
 CREATE POLICY tenant_isolation_select ON subscriptions FOR SELECT TO pharmacy_app USING (tenant_id = current_tenant_id());
-"""
+RLS_POLICIES_SQL_END"""[18:22].replace("RLS_POLICIES_SQL_END", "")
 
 INDEXES_SQL = r"""
 -- Tenants
