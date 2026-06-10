@@ -57,10 +57,11 @@ def get_postgres_urls():
     2. A sync connection string for the target DB (for checks if needed).
     3. The database name.
     """
-    async_url = load_database_url()
+    db_url = load_database_url()
     
-    # Replace +asyncpg with standard postgresql for sync engine
-    sync_url = async_url.replace("+asyncpg", "")
+    # Support standard postgresql:// URLs directly, and strip +asyncpg if present
+    # to convert async strings for our synchronous SQLAlchemy connection.
+    sync_url = db_url.replace("+asyncpg", "")
     
     # Match pattern: protocol://user:pass@host:port/dbname
     # and optional query params (e.g., ?sslmode=require)
@@ -72,7 +73,7 @@ def get_postgres_urls():
         postgres_url = f"{base_url}/postgres{query_params}"
         return postgres_url, sync_url, db_name
     else:
-        raise ValueError(f"Could not parse DATABASE_URL: {async_url}")
+        raise ValueError(f"Could not parse DATABASE_URL: {db_url}")
 
 def init_db_if_not_exists():
     """
