@@ -29,8 +29,10 @@ async def get_db():
             yield session
         finally:
             try:
-                # Reset the role back to default to prevent leakage in connection pooling
+                # Reset the role and clear session variables to prevent leakage in connection pooling
                 await session.execute(text("RESET ROLE"))
+                await session.execute(text("SELECT set_config('app.current_tenant_id', NULL, FALSE)"))
+                await session.execute(text("SELECT set_config('app.current_staff_id', NULL, FALSE)"))
                 await session.commit()
             except Exception:
                 pass

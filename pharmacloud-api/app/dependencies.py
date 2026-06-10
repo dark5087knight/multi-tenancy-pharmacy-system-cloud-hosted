@@ -67,11 +67,11 @@ async def get_current_user(
     # Configure PostgreSQL RLS variables BEFORE running any database query in this transaction!
     await db.execute(text("SET ROLE pharmacy_app"))
     await db.execute(
-        text("SELECT set_config('app.current_tenant_id', :tenant_id, TRUE)"),
+        text("SELECT set_config('app.current_tenant_id', :tenant_id, FALSE)"),
         {"tenant_id": str(tenant_uuid)}
     )
     await db.execute(
-        text("SELECT set_config('app.current_staff_id', :staff_id, TRUE)"),
+        text("SELECT set_config('app.current_staff_id', :staff_id, FALSE)"),
         {"staff_id": str(staff_uuid)}
     )
 
