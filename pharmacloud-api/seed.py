@@ -3,8 +3,24 @@ import sys
 import re
 import uuid
 import json
+import time
+import logging
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
+
+try:
+    from psycopg2 import OperationalError as Psycopg2OpError
+except ImportError:
+    Psycopg2OpError = OperationalError
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger(__name__)
 
 def load_database_url():
     """
@@ -63,7 +79,7 @@ def init_db_if_not_exists():
     Check if the target database exists. If not, create it.
     """
     postgres_url, _, db_name = get_postgres_urls()
-    print(f"Connecting to system DB: postgres at {postgres_url}...")
+    logger.info(f"Connecting to system DB: postgres at {postgres_url}...")
     
     engine = create_engine(postgres_url, isolation_level="AUTOCOMMIT")
     with engine.connect() as conn:
@@ -72,13 +88,13 @@ def init_db_if_not_exists():
             result = conn.execute(text(f"SELECT 1 FROM pg_database WHERE datname='{db_name}'"))
             exists = result.scalar() is not None
             if not exists:
-                print(f"Database '{db_name}' does not exist. Creating...")
+                logger.info(f"Database '{db_name}' does not exist. Creating...")
                 conn.execute(text(f"CREATE DATABASE {db_name}"))
-                print(f"Database '{db_name}' created successfully.")
+                logger.info(f"Database '{db_name}' created successfully.")
             else:
-                print(f"Database '{db_name}' already exists.")
+                logger.info(f"Database '{db_name}' already exists.")
         except Exception as e:
-            print(f"Error checking/creating database '{db_name}': {e}")
+            logger.error(f"Error checking/creating database '{db_name}': {e}")
             raise e
 
 def create_schema_if_not_exists():
@@ -86,40 +102,52 @@ def create_schema_if_not_exists():
     Creates tables, RLS policies, and indexes if they do not exist.
     """
     _, sync_url, _ = get_postgres_urls()
-    print("Checking if database schema exists...")
+    logger.info("Checking if database schema exists...")
     engine = create_engine(sync_url)
     
-    with engine.begin() as conn:
+    # 1. Check if database is already seeded (using a separate connection)
+    schema_exists = False
+    with engine.connect() as conn:
         try:
             conn.execute(text("SELECT 1 FROM plans LIMIT 1"))
-            print("Database schema already exists. Skipping creation.")
-            return
+            schema_exists = True
         except Exception:
-            print("Schema does not exist. Creating schema...")
-            
-        # 1. Run schema DDL
-        try:
-            conn.exec_driver_sql(SCHEMA_SQL)
-            print("Schema tables created successfully.")
-        except Exception as e:
-            print(f"Error creating schema tables: {e}")
-            raise e
-            
-        # 2. Run RLS policies
-        try:
-            conn.exec_driver_sql(RLS_POLICIES_SQL)
-            print("RLS policies applied successfully.")
-        except Exception as e:
-            print(f"Error applying RLS policies: {e}")
-            raise e
-            
-        # 3. Run indexes
-        try:
-            conn.exec_driver_sql(INDEXES_SQL)
-            print("Indexes created successfully.")
-        except Exception as e:
-            print(f"Error creating indexes: {e}")
-            raise e
+            schema_exists = False
+
+    if schema_exists:
+        logger.info("Database schema already exists. Skipping creation.")
+        return
+
+    logger.info("Schema does not exist. Creating schema...")
+    
+    # 2. Run schema creation in a fresh transaction block
+    with engine.begin() as conn:
+        # Execute raw SQL directly on the DBAPI cursor to bypass SQLAlchemy parameter translation issues
+        raw_conn = conn.connection.dbapi_connection
+        with raw_conn.cursor() as cursor:
+            # 1. Run schema DDL
+            try:
+                cursor.execute(SCHEMA_SQL)
+                logger.info("Schema tables created successfully.")
+            except Exception as e:
+                logger.error(f"Error creating schema tables: {e}")
+                raise e
+                
+            # 2. Run RLS policies
+            try:
+                cursor.execute(RLS_POLICIES_SQL)
+                logger.info("RLS policies applied successfully.")
+            except Exception as e:
+                logger.error(f"Error applying RLS policies: {e}")
+                raise e
+                
+            # 3. Run indexes
+            try:
+                cursor.execute(INDEXES_SQL)
+                logger.info("Indexes created successfully.")
+            except Exception as e:
+                logger.error(f"Error creating indexes: {e}")
+                raise e
 
 def hash_password(password: str) -> str:
     """
@@ -139,7 +167,7 @@ def seed_core_data():
     Seed minimal base data needed for a clean installation.
     """
     _, sync_url, _ = get_postgres_urls()
-    print(f"Connecting to database to seed core data...")
+    logger.info(f"Connecting to database to seed core data...")
     engine = create_engine(sync_url)
     
     with engine.begin() as conn:
@@ -150,13 +178,13 @@ def seed_core_data():
                 # To be absolutely sure, check if there are actual plans inserted
                 check_rows = conn.execute(text("SELECT count(*) FROM plans")).scalar()
                 if check_rows > 0:
-                    print("Database already contains seed data (plans found). Skipping seeding.")
+                    logger.info("Database already contains seed data (plans found). Skipping seeding.")
                     return
         except Exception as e:
-            print(f"Checking plans table encountered an error: {e}")
+            logger.error(f"Checking plans table encountered an error: {e}")
             raise e
 
-        print("Seeding core database entities...")
+        logger.info("Seeding core database entities...")
 
         # 2. Platform Plans
         plan_starter_id = uuid.uuid4()
@@ -462,26 +490,66 @@ def seed_core_data():
             }
         )
 
-    print("=" * 60)
-    print("CORE SEEDING COMPLETED SUCCESSFULLY!")
-    print(f"Default Tenant: Default Pharmacy (default)")
-    print(f"Default Branch: Main Branch")
-    print(f"Admin Login Email: admin@pharmacy.com")
-    print(f"Admin Login Password: {admin_password}")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("CORE SEEDING COMPLETED SUCCESSFULLY!")
+    logger.info("Default Tenant: Default Pharmacy (default)")
+    logger.info("Default Branch: Main Branch")
+    logger.info("Admin Login Email: admin@pharmacy.com")
+    logger.info(f"Admin Login Password: {admin_password}")
+    logger.info("=" * 60)
+
+def run():
+    MAX_RETRIES = 10
+    RETRY_DELAY = 10
+    
+    # -------------------------
+    # STEP 1: Create DB
+    # -------------------------
+    db_created = False
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            logger.info(f"Attempting to create database (Attempt {attempt}/{MAX_RETRIES})...")
+            init_db_if_not_exists()
+            db_created = True
+            break
+        except (Psycopg2OpError, OperationalError, Exception) as e:
+            logger.error(f"Failed to create database: {e}")
+            if attempt < MAX_RETRIES:
+                logger.info(f"Retrying in {RETRY_DELAY} seconds...")
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.error("Max retries reached. Exiting.")
+                sys.exit(1)
+
+    if not db_created:
+        sys.exit(1)
+
+    # -------------------------
+    # STEP 2: Seed DB
+    # -------------------------
+    db_seeded = False
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            logger.info(f"Attempting to seed database (Attempt {attempt}/{MAX_RETRIES})...")
+            create_schema_if_not_exists()
+            seed_core_data()
+            db_seeded = True
+            logger.info("Database seeding process finished successfully!")
+            break
+        except (OperationalError, Exception) as e:
+            logger.error(f"Failed to seed database: {e}")
+            if attempt < MAX_RETRIES:
+                logger.info(f"Retrying in {RETRY_DELAY} seconds...")
+                time.sleep(RETRY_DELAY)
+            else:
+                logger.error("Max retries reached. Exiting.")
+                sys.exit(1)
+
+    if not db_seeded:
+        sys.exit(1)
 
 def main():
-    # Step 1: Create DB if not exists
-    init_db_if_not_exists()
-    
-    # Step 2: Create schema/tables/policies/indexes if they do not exist
-    create_schema_if_not_exists()
-    
-    # Step 3: Run core data seeding synchronously
-    seed_core_data()
-
-if __name__ == "__main__":
-    main()
+    run()
 
 # =====================================================================
 # EMBEDDED SQL SCHEMAS (Option 2 - Standalone execution)
@@ -1175,3 +1243,6 @@ CREATE        INDEX IF NOT EXISTS idx_user_roles_staff           ON user_roles (
 CREATE        INDEX IF NOT EXISTS idx_user_roles_role            ON user_roles (role_id);
 CREATE        INDEX IF NOT EXISTS idx_role_permissions_role      ON role_permissions (role_id);
 """
+
+if __name__ == "__main__":
+    main()
