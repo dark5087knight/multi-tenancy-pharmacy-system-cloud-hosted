@@ -1,12 +1,12 @@
-# 💊 Caduceus Multi-Tenancy Pharmacy System (Cloud-Hosted)
+# Caduceus Multi-Tenancy Pharmacy System (Cloud-Hosted)
 
-Welcome to the **Caduceus Pharmacy OS** ecosystem. This repository contains a production-ready, cloud-hosted, multi-tenant pharmacy management platform designed to streamline operations across multiple pharmacies, branches, and warehouses.
+Welcome to the Caduceus Pharmacy OS ecosystem. This repository contains a production-ready, cloud-hosted, multi-tenant pharmacy management platform designed to streamline operations across multiple pharmacies, branches, and warehouses.
 
-The system handles core pharmacy workflows including **inventory tracking, multi-branch procurement, digital prescription processing, secure point-of-sale transactions, structured auditing, and real-time alerts**.
+The system handles core pharmacy workflows including inventory tracking, multi-branch procurement, digital prescription processing, secure point-of-sale transactions, structured auditing, and real-time alerts.
 
 ---
 
-## 🗺️ Architectural Topology
+## Architectural Topology
 
 The application utilizes a distributed, multi-tiered cloud architecture designed for high availability, security, and autoscaling.
 
@@ -50,20 +50,20 @@ AWS VPC (10.1.0.0/16)                   │
 
 ---
 
-## 📂 Repository Structure
+## Repository Structure
 
 The project is structured into three primary sub-systems, alongside modular infrastructure configurations:
 
-1. **Backend API (`pharmacloud-api`)**: FastAPI service driving all business logic, tenant isolation, and transactional workflows.
-2. **Web Portal Client (`pharmasync-hub`)**: Vite + React + TypeScript single-page dashboard optimized for operational administrators and analysts.
-3. **Mobile & Desktop App (`flutter_pharmacy`)**: Cross-platform Dart application optimized for on-the-ground pharmacists, dispensing agents, and managers.
-4. **Infrastructure Setup (`Terraform Labs/build`)**: Complete Infrastructure as Code (IaC) configuration for deploying this suite onto AWS.
+1. Backend API (pharmacloud-api): FastAPI service driving all business logic, tenant isolation, and transactional workflows.
+2. Web Portal Client (pharmasync-hub): Vite + React + TypeScript single-page dashboard optimized for operational administrators and analysts.
+3. Mobile & Desktop App (flutter_pharmacy): Cross-platform Dart application optimized for on-the-ground pharmacists, dispensing agents, and managers.
+4. Infrastructure Setup (Terraform Labs/build): Complete Infrastructure as Code (IaC) configuration for deploying this suite onto AWS.
 
 ---
 
-### 1. ⚙️ Backend Core API: [pharmacloud-api](file:///d:/LAB/Pharmacy/pharmacloud-api)
+### 1. Backend Core API: [pharmacloud-api](file:///d:/LAB/Pharmacy/pharmacloud-api)
 
-The backend services are engineered with **FastAPI** to support asynchronous database interaction and sub-millisecond response latency.
+The backend services are engineered with FastAPI to support asynchronous database interaction and sub-millisecond response latency.
 
 * **Key File References**:
   * **API Entrypoint**: [main.py](file:///d:/LAB/Pharmacy/pharmacloud-api/app/main.py)
@@ -83,7 +83,7 @@ The backend services are engineered with **FastAPI** to support asynchronous dat
 
 ---
 
-### 2. 💻 React Web Hub: [pharmasync-hub](file:///d:/LAB/Pharmacy/pharmasync-hub)
+### 2. React Web Hub: [pharmasync-hub](file:///d:/LAB/Pharmacy/pharmasync-hub)
 
 The React web client provides management interfaces for reporting, metrics, billing, tenant creation, and configuration management.
 
@@ -97,7 +97,7 @@ The React web client provides management interfaces for reporting, metrics, bill
 
 ---
 
-### 3. 📱 Cross-Platform Flutter App: [flutter_pharmacy](file:///d:/LAB/Pharmacy/flutter_pharmacy)
+### 3. Cross-Platform Flutter App: [flutter_pharmacy](file:///d:/LAB/Pharmacy/flutter_pharmacy)
 
 The client application is built in Dart & Flutter, supporting Android, iOS, Windows, macOS, and Linux targets.
 
@@ -111,13 +111,13 @@ The client application is built in Dart & Flutter, supporting Android, iOS, Wind
 #### Key Operational Features
 * **Adaptive API Target Routing**: Users can switch target backends directly from the Login page or from the Settings panel.
 * **Intelligent Cookie & Cache Clearing**: When switching backend host targets, the provider invalidates existing JWT sessions, resets client caches, and logs out the user to prevent cross-tenant data leaks.
-* **Robust Network Service**: Configured with a 10–15s connection request limit to accommodate variable cellular and cloud load latency, featuring automated header validation.
+* **Robust Network Service**: Configured with a 10-15s connection request limit to accommodate variable cellular and cloud load latency, featuring automated header validation.
 
 ---
 
-## ☁️ Infrastructure-As-Code (IaC) Architecture
+## Infrastructure-As-Code (IaC) Architecture
 
-The infrastructure configuration reside inside the Terraform directory: [Terraform Labs/build](file:///D:/LAB/Terraform Labs/build).
+The infrastructure configuration resides inside the Terraform directory: [Terraform Labs/build](file:///D:/LAB/Terraform Labs/build).
 
 | File Name | Purpose / Resource Definition |
 | :--- | :--- |
@@ -135,7 +135,7 @@ The infrastructure configuration reside inside the Terraform directory: [Terrafo
 
 ---
 
-## 🚀 Deployment & Local Development
+## Deployment & Local Development
 
 ### 1. Database & Backend API Setup
 Copy `.env.example` to `.env` inside [pharmacloud-api](file:///d:/LAB/Pharmacy/pharmacloud-api) and adjust variables:
